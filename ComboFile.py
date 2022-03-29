@@ -21,6 +21,17 @@ def semi_colon_checker(text):
         semi_colon_flag= True
         #return(semi_colon_flag)
 
+def error_file_write(file):
+    with open('test2_v2File.csv', 'a+', newline='') as result_file:
+        wr = csv.writer(result_file)  # , dialect='excel')
+        element1 = 'File'
+        element2 = 'Not'
+        element3 = 'Read'
+        element4 = file
+        list_of_Defendants = [element1, element2, element3, element4]
+        for i in list_of_Defendants:
+            wr.writerows([i])
+
 
 path = "/Users/miguelgarcia/Desktop/Files"
 dir_list = os.listdir(path)
@@ -30,16 +41,17 @@ row_count = 0
 #print the list
 print(dir_list)
 #file = open("0001624 - Burke v. 3M Company.pdf", "rb")
-'''
-file = open("0001577 - City of Oconomowoc Wasterwater Tre.pdf", "rb")
-for filename in os.listdir(dir_list):
-   with open(os.path.join("files", filename), 'r') as f:
-       text = f.read()
-       print(text)
-'''
+
 for file in dir_list:
     semi_colon_flag = False
-    reader = PdfFileReader(file)
+    reader = None
+    try:
+        reader = PdfFileReader(file)
+    except IOError:
+        print("Could not read file: ", file)
+        error_file_write(file)
+        break
+
     print('reading file: ', file)
 
     page1 = reader.getPage(0)
@@ -270,6 +282,7 @@ for file in dir_list:
     #will separate defendants into fka/dba(s), successors,
     list_of_Defendants = []
 
+    #writes names to file
     for defendant in defendants:
         print("defendant: ", defendant)
         curr_index = defendants.index(defendant)
@@ -281,7 +294,7 @@ for file in dir_list:
         element1 = defendant
         element2 = 'NULL'
         element3 = 'NULL'
-        element4 = 'NULL'
+        element4 = file
 
         for fka in fka_dict:
             if re.search(fka, defendant):  # do some regex magiv for fka, f/k/a, FKA, F/K/A, etc
@@ -426,28 +439,6 @@ for file in dir_list:
                     break
 
 
-
-                """
-                comma_check = len(first_name) - 1
-                print('comma at index: ', comma_check)
-
-                if defendant[comma_check] == ',':
-                    print('yes, there is a comma')
-                    first_name = defendant[:comma_check]
-
-                print('first name: ', first_name)
-
-                second_name = defendant[successor_start_index:].lstrip()
-                print('second name: ', second_name)
-                # new = name.split(fka, name)
-                # element1 = line.split(r'f/k', 1)[0].lstrip()  # 'f/k/a' for f/ or '(' for (f/k/a
-                # element2 = line.split('f/k/a', 1)[-1].rstrip(')').lstrip()
-
-                element1 = first_name
-                element3 = second_name
-
-                break
-                """
 
 
 
