@@ -42,7 +42,7 @@ from pathlib import Path
 from itertools import islice
 import csv
 
-file = open("0001624 - Burke v. 3M Company.pdf", "rb")
+file = open("C1_1.pdf", "rb")
 
 dict = "vs."
 
@@ -155,7 +155,7 @@ for page in islice(range(NumPages), vsPageInt, defendantsPageInt):
     #print(page_text)
 
     take2 = [page_text]
-    print(take2)
+    print("take 2: ", take2)
 
     #sentence_list = [sentence for sentence in re.split('\n', page_text)]
     #print(sentence_list)
