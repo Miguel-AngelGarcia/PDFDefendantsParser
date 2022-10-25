@@ -44,7 +44,7 @@ successor_dict = ['individu', 'successo']  # for 'individually and as successor'
 plaintiff_dict = ['Plaintiff\,', 'Plaintiffs\,', 'Plaintiff\\n,', 'Plaintiffs\\n,', 'Plaintiff', 'Plaintiffs']
 defendants_dict = ['Defendant\.', 'Defendants\.', '\\nDefendant\\n', '\\nDefendants\\n', 'Defendant\\n', 'Defendants\\n']
 
-files = [file for file in glob.glob("/Users/miguelgarcia/Desktop/Processed/DidntWorkTryPDF2Text/*")]
+files = [file for file in glob.glob("/Users/miguelgarcia/Desktop/Work/LitigationTracking/JuneComplaints/JunesFirstBatch/JuneComplaintsEdit/*")]
 
 first_line_present = False
 
@@ -235,42 +235,78 @@ for file_name in files:
                 text1 = None
 
                 if present_vs: #finds the vs./against/v. | looking to find page naming plaintiffs vs defendants
+                    for x in range(0, NumPages):
+                        PageObj1 = reader.getPage(x)
+                        text1 = PageObj1.extractText()
+                        text1 = text1.replace('\n', '')
+                        if re.search(vs, text1, flags=re.IGNORECASE):
+                            # print(vs, " Found on Page: " + str(x))
+                            vs_pages.append(x)
+                            vs_used = vs
+                            # vsPage = i
 
+                    # exits loop when vs variable is found
+                    break
 
         plaint_vs_test = None
-        if vs_done == False:
-            for plaintiff in plaintiff_dict:
+        if vs_plain_check == False and plain_done == False:
+            for vs_page in vs_pages:
                 vs_plain_check = False
-                for vs_page in vs_pages:
-                    plaint_vs_test = reader[vs_page]
-                    #plaint_vs_test = PageObj1.extractText()
-                    if re.search(plaintiff, plaint_vs_test, flags=re.IGNORECASE):
-                        print(vs_used, "AND ", plaintiff, "Found on Page: " + str(vs_page))
-                        vs_plaintiff_pages.append(vs_page)
-                        vs_done = True
-                        vs_plain_check = True
+                if plain_done == False:
+                    for plaintiff in plaintiff_dict:
+                        PageObj1 = reader.getPage(vs_page)
+                        plaint_vs_test = PageObj1.extractText()
+                        plaint_vs_test = plaint_vs_test.replace('\n', '')
+
+                        # should we check if present_defendant is after plaintiff and vs on page???
+                        present_plaintif = re.search(plaintiff, plaint_vs_test, flags=re.IGNORECASE)
+                        if present_plaintif:
+                            # print(vs_used,  "AND ", plaintiff, "Found on Page: " + str(vs_page))
+                            # vs_plaintiff_pages.append(vs_page)
+                            vs_done = True
+                            vs_plain_check = True
+                            plain_done = True
+                            plain_used = plaintiff
+                            break
+                            # get out of finding 'plaintiff' loop
 
                         # vsPage = i
+                if plain_done == True:  # when 'plaintiff' on same page as 'vs' is found, looks for other vs_pages where both occur
+                    PageObj1 = reader.getPage(vs_page)
+                    plaint_vs_test = PageObj1.extractText()
+                    plaint_vs_test = plaint_vs_test.replace('\n', '')
+
+                    present_plaintif = re.search(plain_used, plaint_vs_test, flags=re.IGNORECASE)
+                    if present_plaintif:
+                        vs_plaintiff_pages.append(vs_page)
+
+                # print(vs_used,  "AND ", plaintiff, "Found on Page: " + str(vs_page))
+                # vs_plaintiff_pages.append(vs_page)
 
                 if vs_plain_check == True:
                     break
 
-                """
-                EDGE-IEST CASE
-                present_plaintiff = re.search(plaintiff, curr_page_text)
-                vs_location = re.search(vs, curr_page_text)
-                print(present_vs, "is present")
-                print('vs location: ', vs_location)
-                    if present_plaintiff: #finds the plaintiff variable | in case we dont have vs and plaintiff on same page
-                    for x in range(0, NumPages):
-                        PageObj1 = reader.getPage(x)
-                        text1 = PageObj1.extractText()
-                        if re.search(plaintiff, text1, flags=re.IGNORECASE):
-                            print(vs, " Found on Page: " + str(x))
-                            plaintiff_pages.append(x)
-                            plaintiff_used = plaintiff
+                # is there is no 'vs' in the document, will go here
+                if vs_plain_check == False and plain_done == False:  # if there is no 'vs'
+                    for plaintiff in plaintiff_dict:
+                        this_plain_leave_loop = False
 
-                """
+                        present_plaintiff = re.search(plaintiff, curr_page_text, flags=re.IGNORECASE)
+                        if present_plaintiff:
+                            for x in range(0, NumPages):
+                                PageObj1 = reader.getPage(x)
+                                text1 = PageObj1.extractText()
+                                text1 = text1.replace('\n', '')
+                                text1 = text1.replace('Attorneys for Plaintiffs', 'AttorneysforPlaintiffs').replace(
+                                    'Attorney for Plaintiffs', 'AttorneyforPlaintiffs')
+                                if re.search(plaintiff, text1, flags=re.IGNORECASE):
+                                    plaintiff_pages.append(x)
+                                    plain_done = True
+                                    plain_used = plaintiff
+                                    this_plain_leave_loop = True
+
+                        if this_plain_leave_loop == True:
+                            break
 
         if def_done == False:
             for defendant in defendants_dict:
@@ -297,6 +333,9 @@ for file_name in files:
                             # vsPage = i
                     # exits loop when defendant variable is found
                     break
+        # if we found all three, we will stop checking other pdf pages
+        if vs_done == True and plain_done == True and def_done == True and case_num_done == True:
+            break
 
     print('vs pages: ', vs_pages)
     print('vs plaintiff pages: ', vs_plaintiff_pages)

@@ -1,3 +1,4 @@
+import PyPDF2
 import re
 from PyPDF2 import PdfFileWriter, PdfFileReader
 from pathlib import Path
@@ -5,15 +6,17 @@ from itertools import islice
 import csv
 import os
 import glob
-import pdftotext
+from pdfminer.high_level import extract_text
+#from pdfminer.high_level import ex
 # import textract
 import codecs
 
-#add if 'and' in last defendant, so split properly
-#figure out how to get case 2-cv-XXXXX over case no: 21stvXXXXX | maybe if in earlier part of page
+
+# from nltk.corpus.reader.plaintext import PlaintextCorpusReader
+
 
 def error_file_write(file_write):
-    with open('MiguelAugustRun.csv', 'a+', newline='') as result_file:
+    with open('testPDFcutter.csv', 'a+', newline='') as result_file:
         wr = csv.writer(result_file)  # , dialect='excel')
         element1 = 'File'
         element2 = 'Not'
@@ -47,30 +50,24 @@ def semi_colon_checker(text):
 
 case_index = ['case no\.', 'case', 'case no', 'INDEX NO\.', 'index', 'CAUSE NO\.', 'NO\.', 'CASE ID:']
 vs_test_dict = ['vs\.', 'v\.', '-against', 'against \\n', 'versus\\n']
-delimiter_dict = ['Company', 'INCORPORATED', 'Inc.', 'L.P.', 'LP', 'LLC', 'L.L.C.', 'Corporation', 'Co.', \
-                  'Ltd', 'PLC', 'PBC', 'P.C.', 'L.L.C', 'S.A.', 'U.S.A.', 'USA', 'Inc']
-fka_dict = ['f/k/a', 'fka', 'd/b/a', 'dba', 'd.b.a.']
+delimiter_dict = ['Company', 'INCORPORATED', 'Inc.', 'L.P.', 'LP', 'LLC', 'L.L.C.', 'Corporation', 'Co.', 'Ltd']
+fka_dict = ['f/k/a', 'fka', 'd/b/a', 'dba']
 successor_dict = ['individu', 'successo']  # for 'individually and as successor', 'successor-in-interest'
 
 plaintiff_dict = ['Plaintiff\,', 'Plaintiffs\,', 'Plaintiff\\n,', 'Plaintiffs\\n,', 'Plaintiff', 'Plaintiffs']
 defendants_dict = ['Defendant\.', 'Defendants\.', '\\nDefendant\\n', '\\nDefendants\\n', 'Defendant\\n',
-                   'Defendants\\n', 'Defendant', 'Defendants']
+                   'Defendants\\n']
 
-first_line_present = False
-files = [file for file in glob.glob("/Users/miguelgarcia/Desktop/Work/LitigationTracking/September-October/complaints-20221004-MiguelRun/Cut/*")]
+"""
+for root, dirs, files in os.walk('/Users/miguelgarcia/Desktop/Processed/zTest'):
+    for file in files:
+        print(file)
+"""
 
-complaint_num = 1
-
+files = [file for file in glob.glob("/Users/miguelgarcia/Desktop/Processed/zTest/*")]
 for file_name in files:
-    list_of_Defendants = []
 
-    # writes the first line so we can tell where runs stop and start
-    if first_line_present == False:
-        run_differentiator = ['this', 'is', 'the', 'next', 'run']
-        headers = ['DefendantName', 'F/K/A_or_D/B/A', 'Successor', 'DocName', 'CaseNumber', 'DefendantOrder', 'ComplaintOrder']
-        list_of_Defendants.append(run_differentiator)
-        list_of_Defendants.append(headers)
-
+    # for file in dir_list:
     semi_colon_flag = False
     reader = None
     file_string = str(file_name)  # using 'file' in reader variable was not reading the file/returned NoneType
@@ -81,11 +78,10 @@ for file_name in files:
 
     file_write = os.path.basename(os.path.normpath(file_string))
 
-    first_line_present = True
     try:
         # pdf_file = open(file,'rb')
-        with open(file_string, "rb") as f:
-            reader = pdftotext.PDF(f)
+        # print(type(pdf_file))
+        reader = PdfFileReader(file_string)
 
     except IOError:
         print("Could not read file: ", file_string)
@@ -135,16 +131,17 @@ for file_name in files:
 
     print('reading file: ', file_string)
     print(type(reader))
-    NumPages = len(reader)
-    #page1 = reader.getPage(0)
-    page1Data = reader[0]
+    NumPages = reader.getNumPages()
+    page1 = reader.getPage(0)
+    page1Data = page1.extractText()
     # page1Data = textract.process(page1Data)
     print([page1Data])
 
     for i in range(NumPages):
-        #curr_page = reader.getPage(i)
-        curr_page_text = reader[i]
+        curr_page = reader.getPage(i)
+        curr_page_text = curr_page.extractText()
         curr_page_text = curr_page_text.replace('\n', '')
+        curr_page_text = extract_page
         # print('on page index: ', i)
 
         if case_num_done == False:
@@ -176,16 +173,12 @@ for file_name in files:
                             if new_rough[0] == ":":
                                 new_rough = new_rough[1:].lstrip()
 
-                            needs_work = False
-                            while needs_work == False:  # trying to keep the '-DSF-PJW' in 2:20-cv-03317-DSF-PJW to prevent possible duplicates
-                                # maybe just do a if ' ' in new_rough
-                                if new_rough[-1].isalpha() or new_rough[-1] == '-' or new_rough[-1].isspace():
-                                    if ' ' in new_rough:
-                                        new_rough = new_rough[0:-1]
-                                    else:
-                                        needs_work = True
+                            is_alpha = False
+                            while is_alpha == False:
+                                if new_rough[-1].isalpha() or new_rough[-1] == '-':
+                                    new_rough = new_rough[0:-1]
                                 else:
-                                    needs_work = True
+                                    is_alpha = True
 
                             numbersInCase = sum(i.isdigit() for i in new_rough)
 
@@ -196,7 +189,6 @@ for file_name in files:
                                 continue
 
                             case_finer = new_rough.rstrip()
-                            case_number = case_finer
                             break
 
                         ###out of cv_search loop
@@ -226,9 +218,6 @@ for file_name in files:
                         if case_finer_digit > case_number_digit:
                             case_number = case_rough.rstrip()
 
-                        if case_num_done == True:
-                            break
-
         if vs_done == False:
             for vs in vs_test_dict:
                 pattern = "rB'" + vs + "'"  # need to 'B' to make sure the string ends in the above in vs_dict
@@ -246,8 +235,8 @@ for file_name in files:
 
                 if present_vs:  # finds the vs./against/v. | looking to find page naming plaintiffs vs defendants
                     for x in range(0, NumPages):
-                        #PageObj1 = reader.getPage(x)
-                        text1 = reader[x]
+                        PageObj1 = reader.getPage(x)
+                        text1 = PageObj1.extractText()
                         text1 = text1.replace('\n', '')
                         if re.search(vs, text1, flags=re.IGNORECASE):
                             # print(vs, " Found on Page: " + str(x))
@@ -260,38 +249,24 @@ for file_name in files:
 
         plaint_vs_test = None
         if vs_plain_check == False and plain_done == False:
-            for vs_page in vs_pages:
+            for plaintiff in plaintiff_dict:
                 vs_plain_check = False
-                if plain_done == False:
-                    for plaintiff in plaintiff_dict:
-                        #PageObj1 = reader.getPage(vs_page)
-                        plaint_vs_test = reader[vs_page]
-                        plaint_vs_test = plaint_vs_test.replace('\n', '')
-
-                        # should we check if present_defendant is after plaintiff and vs on page???
-                        present_plaintif = re.search(plaintiff, plaint_vs_test, flags=re.IGNORECASE)
-                        if present_plaintif:
-                            # print(vs_used,  "AND ", plaintiff, "Found on Page: " + str(vs_page))
-                            # vs_plaintiff_pages.append(vs_page)
-                            vs_done = True
-                            vs_plain_check = True
-                            plain_done = True
-                            plain_used = plaintiff
-                            break
-                            # get out of finding 'plaintiff' loop
-
-                        # vsPage = i
-                if plain_done == True:  # when 'plaintiff' on same page as 'vs' is found, looks for other vs_pages where both occur
-                    #PageObj1 = reader.getPage(vs_page)
-                    plaint_vs_test = reader[vs_page]
+                for vs_page in vs_pages:
+                    PageObj1 = reader.getPage(vs_page)
+                    plaint_vs_test = PageObj1.extractText()
                     plaint_vs_test = plaint_vs_test.replace('\n', '')
 
-                    present_plaintif = re.search(plain_used, plaint_vs_test, flags=re.IGNORECASE)
+                    # should we check if present_defendant is after plaintiff and vs on page???
+                    present_plaintif = re.search(plaintiff, plaint_vs_test, flags=re.IGNORECASE)
                     if present_plaintif:
+                        # print(vs_used,  "AND ", plaintiff, "Found on Page: " + str(vs_page))
                         vs_plaintiff_pages.append(vs_page)
+                        vs_done = True
+                        vs_plain_check = True
+                        plain_done = True
+                        plain_used = plaintiff
 
-                # print(vs_used,  "AND ", plaintiff, "Found on Page: " + str(vs_page))
-                # vs_plaintiff_pages.append(vs_page)
+                        # vsPage = i
 
                 if vs_plain_check == True:
                     break
@@ -300,22 +275,39 @@ for file_name in files:
         if vs_plain_check == False and plain_done == False:  # if there is no 'vs'
             for plaintiff in plaintiff_dict:
                 this_plain_leave_loop = False
+                for x in range(0, NumPages):
+                    PageObj1 = reader.getPage(x)
+                    text1 = PageObj1.extractText()
+                    text1 = text1.replace('\n', '')
+                    text1 = text1.replace('Attorneys for Plaintiffs', 'AttorneysforPlaintiffs').replace(
+                        'Attorney for Plaintiffs', 'AttorneyforPlaintiffs')
+                    present_plaintiff = re.search(plaintiff, text1, flags=re.IGNORECASE)
 
-                present_plaintiff = re.search(plaintiff, curr_page_text, flags=re.IGNORECASE)
-                if present_plaintiff:
-                    for x in range(0, NumPages):
-                        #PageObj1 = reader.getPage(x)
-                        text1 = reader[x]
-                        text1 = text1.replace('\n', '')
-                        text1 = text1.replace('Attorneys for Plaintiffs', 'AttorneysforPlaintiffs').replace('Attorney for Plaintiffs', 'AttorneyforPlaintiffs')
-                        if re.search(plaintiff, text1, flags=re.IGNORECASE):
-                            plaintiff_pages.append(x)
-                            plain_done = True
-                            plain_used = plaintiff
-                            this_plain_leave_loop = True
+                    if present_plaintiff:
+                        plaintiff_pages.append(x)
+                        plain_done = True
+                        plain_used = plaintiff
+                        this_plain_leave_loop = True
 
                 if this_plain_leave_loop == True:
                     break
+
+                """
+                EDGE-IEST CASE
+                present_plaintiff = re.search(plaintiff, curr_page_text)
+                vs_location = re.search(vs, curr_page_text)
+                print(present_vs, "is present")
+                print('vs location: ', vs_location)
+                    if present_plaintiff: #finds the plaintiff variable | in case we dont have vs and plaintiff on same page
+                    for x in range(0, NumPages):
+                        PageObj1 = reader.getPage(x)
+                        text1 = PageObj1.extractText()
+                        if re.search(plaintiff, text1, flags=re.IGNORECASE):
+                            print(vs, " Found on Page: " + str(x))
+                            plaintiff_pages.append(x)
+                            plaintiff_used = plaintiff
+
+                """
 
         if def_done == False:
             for defendant in defendants_dict:
@@ -334,8 +326,8 @@ for file_name in files:
                 # should we be checking only the defendant pages after 'plaintiff' and 'vs'???
                 if present_defendant:
                     for x in range(0, NumPages):
-                        #PageObj1 = reader.getPage(x)
-                        text1 = reader[x]
+                        PageObj1 = reader.getPage(x)
+                        text1 = PageObj1.extractText()
                         text1 = text1.replace('\n', '')
                         # text1 = textract.decode('utf')
                         if re.search(defendant, text1, flags=re.IGNORECASE):
@@ -346,10 +338,6 @@ for file_name in files:
                             # vsPage = i
                     # exits loop when defendant variable is found
                     break
-
-        # if we found all three, we will stop checking other pdf pages
-        if vs_done == True and plain_done == True and def_done == True and case_num_done == True:
-            break
 
     # out of loop finding 'vs', 'plaintiff, 'defendant'
     print('vs pages: ', vs_pages)
@@ -515,11 +503,10 @@ for file_name in files:
 
     # this becomes the text from the pages, but as a string
     document_text = ''
-    for page in islice(range(end_index), start_index,
-                       end_index):  ##changed 'number_of_pages' to 'end_index' to resolved errors of not running loop
+    for page in islice(range(number_of_pages), start_index, end_index):
         print('on page: ', page)
-        #page_num = reader.getPage(page)
-        page_text = reader[page]
+        page_num = reader.getPage(page)
+        page_text = page_num.extractText()
         # print('hi')
         # print(page_text)
         document_text += page_text
@@ -528,7 +515,6 @@ for file_name in files:
     # document_text.encode('utf-8')
     # document_text.decode(encodings = 'utf-8')
     document_text = document_text.replace("™", "'").replace('\n', '')
-    document_text = document_text.replace("‚Äô", "'")
     document_text = document_text.replace('Attorneys for Plaintiffs', 'AttorneysforPlaintiffs').replace(
         'Attorney for Plaintiffs', 'AttorneyforPlaintiffs')
 
@@ -579,9 +565,9 @@ for file_name in files:
 
     # turns text(STRING) into a list to remove '\n' and turns it back into a string
     list = [document_text.replace('\n', '')]
-    # print(list)
+    print(list)
     text = document_text.join(list)
-    # print(document_text)
+    print(document_text)
 
     # next thing if plaintiff page #<= vs page # <= defendant page #
 
@@ -638,8 +624,8 @@ for file_name in files:
             for delimeter in delimiter_dict:
                 if text[end_index] == ',' and (
                         fka.casefold() in search_area.casefold() or delimeter.casefold() in search_area.casefold()):
-                    # print(text[start_index:end_index])
-                    # print("yes there is a comma at index: ", end_index, ' and other name in search area: ', search_area)
+                    print(text[start_index:end_index])
+                    print("yes there is a comma at index: ", end_index, ' and other name in search area: ', search_area)
                     end_index = next_comma
 
                     try:  # was a problem with the last text sometimes
@@ -722,7 +708,6 @@ for file_name in files:
             next_comma = comma_indexes[curr_index + 1]
         except IndexError:
             next_comma = 'null'
-            next_comma = len(text)
             # next_comma = len(text) ??????
 
         for successor in successor_dict:
@@ -763,60 +748,15 @@ for file_name in files:
         print(curr_def)
 
         and_pattern = re.compile("r'^and\s'")
-
-        potential_and_checker = re.match(r'^and', curr_def, flags=re.IGNORECASE)
-        if potential_and_checker:  # add ignore case? replace by indexes?
+        if re.match(r'^and\s', curr_def):
             print('yes it does')
-            # potential_and = curr_def.replace("and", "").lstrip()
-            potential_and = curr_def[potential_and_checker.end():]  # removes any 'And'
-            potential_and = potential_and.lstrip()
+            potential_and = curr_def.replace("and", "").lstrip()
+            # print(potential_and)
+            #    print(potential_and)
+            #    print(type(potential_and))
             defendants[curr_def_index] = potential_and
             # print(curr_def)
     # print(defendants)
-
-    # eliminates 'and' anywhere in defendant name and will split them there
-    for defendant in defendants:
-        curr_def_index = defendants.index(defendant)
-        curr_def = defendants[curr_def_index]
-
-        and_check = re.search('and', curr_def)  # we only want 'and', thus will not case ignore
-
-        if and_check:  # yes, 'and; is here
-            successor_check = False
-            fka_check = False
-
-            # these two checks to make sure we keep FKA/DBAs or 'and as succesor' in tact
-            for successor in successor_dict:
-                if re.search(successor, curr_def, flags=re.IGNORECASE):  # if 'and as successor' it will skip the cut
-                    successor_check = True
-                    break
-
-            if successor_check == True:
-                continue
-
-            for fka in fka_dict:
-                if re.search(fka, curr_def, flags=re.IGNORECASE):
-                    fka_check = True
-                    break
-
-            if fka_check == True:
-                continue
-
-            and_start_ind = and_check.start()
-            and_end_ind = and_check.end()
-            defendants.remove(curr_def)
-
-            first_and_def = curr_def[:and_start_ind]
-            first_and_def = first_and_def.rstrip()
-
-            sec_and_def = curr_def[and_end_ind:]
-            sec_and_def = sec_and_def.lstrip()
-
-            first_add_index = curr_def_index
-            sec_add_index = curr_def_index + 1
-
-            defendants.insert(first_add_index, first_and_def)
-            defendants.insert(sec_add_index, sec_and_def)
 
     # will get rid of empty strings
     try:
@@ -825,11 +765,9 @@ for file_name in files:
         pass
 
     # will separate defendants into fka/dba(s), successors,
-    # list_of_Defendants = [] || moved to the top
+    list_of_Defendants = []
 
     # writes names to file
-    def_order_num = 1
-
     for defendant in defendants:
         print("defendant: ", defendant)
         curr_index = defendants.index(defendant)
@@ -842,10 +780,6 @@ for file_name in files:
         element2 = 'NULL'
         element3 = 'NULL'
         element4 = file_write
-        element6 = def_order_num
-        element7 = complaint_num
-
-        def_order_num += 1
 
         try:
             element5 = case_number
@@ -860,13 +794,13 @@ for file_name in files:
                 # But, will be going over all names because they remain unchanged in the copy of the list
                 done = False
 
-                # print('current name: ', defendant)
-                # print("yes, there is: ", fka)
+                print('current name: ', defendant)
+                print("yes, there is: ", fka)
 
                 fka_start_index = re.search(fka, defendant, flags=re.IGNORECASE).start()
-                # print(fka, 'start index: ', fka_start_index)
+                print(fka, 'start index: ', fka_start_index)
                 parenthesis_check = fka_start_index - 1
-                # print('parenthesis index: ', parenthesis_check)
+                print('parenthesis index: ', parenthesis_check)
 
                 if defendant[parenthesis_check] == '(':
                     print('yes parenthesis')
@@ -877,14 +811,12 @@ for file_name in files:
                         defendant = defendant[:comma_check] + defendant[comma_check + 1:]
 
                     first_name = defendant.split('(', 1)[0].rstrip()
-                    # print('first name: ', first_name)
+                    print('first name: ', first_name)
 
                     pattern = '(' + fka
-                    # print('pattern :', pattern)
+                    print('pattern :', pattern)
                     second_name = defendant.split(pattern, 1)[-1].lstrip().rstrip(')')
-                    # print('second name: ', second_name)
-
-                    second_name = fka + ": " + second_name
+                    print('second name: ', second_name)
 
                     element1 = first_name
                     element2 = second_name
@@ -893,7 +825,7 @@ for file_name in files:
 
                 else:
                     print('no parenthesis')
-                    #for uppercase, maybe replace by indeex? or convert to upper or lower
+
                     first_name = defendant.split(fka)[0].rstrip()
                     comma_check = len(first_name) - 1
                     print('comma at index: ', comma_check)
@@ -910,7 +842,6 @@ for file_name in files:
                     # element1 = line.split(r'f/k', 1)[0].lstrip()  # 'f/k/a' for f/ or '(' for (f/k/a
                     # element2 = line.split('f/k/a', 1)[-1].rstrip(')').lstrip()
                     print('new string')
-                    second_name = fka + ": " + second_name
 
                     element1 = first_name
                     element2 = second_name
@@ -926,6 +857,9 @@ for file_name in files:
                 break
 
                 print('found ', fka)
+
+
+
 
             else:
                 print("nope, no: ", fka)
@@ -962,7 +896,7 @@ for file_name in files:
                     pattern = '('
                     print('pattern :', pattern)
                     successor_name = defendant.split(pattern, 1)[-1].lstrip().rstrip(')')
-                    # print('second name: ', second_name)
+                    print('second name: ', second_name)
 
                     element1 = first_name
                     element3 = successor_name
@@ -983,7 +917,7 @@ for file_name in files:
                     print('first name: ', first_name)
 
                     successor_name = defendant[successor_start_index:].lstrip()
-                    # print('second name: ', second_name)
+                    print('second name: ', second_name)
                     # new = name.split(fka, name)
                     # element1 = line.split(r'f/k', 1)[0].lstrip()  # 'f/k/a' for f/ or '(' for (f/k/a
                     # element2 = line.split('f/k/a', 1)[-1].rstrip(')').lstrip()
@@ -994,24 +928,12 @@ for file_name in files:
 
                     break
 
-        # Gets ride of leading '-' in '- 3M Company'
-        if vs_used == '-against':
-            try:
-                if element1[0] == '-':  # trying to eleminate remaining '-' in '-against-'
-                    element1 = element1[1:]  # gets of '-'
-                    element1 = element1.lstrip()  # gets rid of whitespace
-                    # '- 3M' -> '3M'
-            except IndexError:
-                pass
-
-
-        next_defendant = [element1, element2, element3, element4, element5, element6, element7]
+        next_defendant = [element1, element2, element3, element4, element5]
         list_of_Defendants.append(next_defendant)
 
     print((list_of_Defendants))
-    complaint_num += 1
 
-    with open('MiguelAugustRun.csv', 'a+', newline='', encoding='utf-8') as result_file:
+    with open('testPDFcutter.csv', 'a+', newline='', encoding='utf-8') as result_file:
         wr = csv.writer(result_file)  # , dialect='excel')
         # for row in open("test2_v2File.csv"):
         # row_count += 1
