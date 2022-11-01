@@ -9,9 +9,10 @@ import pdftotext
 # import textract
 import codecs
 
-#add if 'and' in last defendant, so split properly
+#added if 'and' in last defendant, so split properly
 #figure out how to get case 2-cv-XXXXX over case no: 21stvXXXXX | maybe if in earlier part of page
 
+#will write to csv that the pdf was not read
 def error_file_write(file_write):
     with open('MiguelAugustRun.csv', 'a+', newline='') as result_file:
         wr = csv.writer(result_file)  # , dialect='excel')
@@ -35,6 +36,8 @@ def name_remover(fka, defendant):
     print('')
 
 
+#will check if semi-colons are present.
+#if yes, hopefully these is what separates one defendant from the next
 def semi_colon_checker(text):
     print('at checker')
     if ';' in text:
@@ -61,10 +64,22 @@ files = [file for file in glob.glob("/Users/miguelgarcia/Desktop/Work/Litigation
 
 complaint_num = 1
 
+'''
+This code is to extract defendants from legal documents,
+
+Theoretically, we would like the steps to follow as
+1.) Read in PDF document
+2.) Script searches for the keywords 'plaintiff', 'vs', & 'defendant' - preferably in this order
+3.) If found, the Defendants we are seeking (listed between 'plaintiff, vs' & 'defendant' should be extracted
+4.) docket number will be extracted so we can identify case-defendant
+5.) information will be output: defendant, any other names, documentName, docketNumber, defendantOrder 
+'''
+
+
 for file_name in files:
     list_of_Defendants = []
 
-    # writes the first line so we can tell where runs stop and start
+    # writes the first line so we can tell where runs stops and starts
     if first_line_present == False:
         run_differentiator = ['this', 'is', 'the', 'next', 'run']
         headers = ['DefendantName', 'F/K/A_or_D/B/A', 'Successor', 'DocName', 'CaseNumber', 'DefendantOrder', 'ComplaintOrder']
@@ -94,7 +109,7 @@ for file_name in files:
         continue
 
     # Extract text and do the search
-    # siwtch the pages loop to outer, vs loop to inner
+    # switch the pages loop to outer, vs loop to inner
     # page loop
     # plaintiff
     # vs loop
@@ -368,7 +383,7 @@ for file_name in files:
     """
     pdv_too_late
     helps in instances where all three occur on page 53, when defendants were earlier in doc
-    think plaintiff versus happens on first page, then defendants but all three ovvur on page 53
+    think "plaintiff-versus" happens on first page, then defendants on 2nd page BUT then all three occur on page 53
     page 53 wont be useful, those are just keywords.
     """
 
@@ -490,7 +505,7 @@ for file_name in files:
     end_index = None
     start_index = None
 
-    # ideally, case 1 happens when all three occur early in the pdf, tryinh to ignore cases where it happenbs in the end
+    # ideally, case 1 happens when all three occur early in the pdf, trying to ignore cases where it happens in the end
     # case 2, happens when 'plaintiff&vs' happen, and 'defendant' occurs right after
     # case 3, the least likely, is first occurence where 1.) plaintiff, 2.) vs,3.) defendant
 
@@ -532,7 +547,7 @@ for file_name in files:
     document_text = document_text.replace('Attorneys for Plaintiffs', 'AttorneysforPlaintiffs').replace(
         'Attorney for Plaintiffs', 'AttorneyforPlaintiffs')
 
-    # see if vs comes after plaintiff and defendant(ie, no 'vs'' that is of use to us)
+    # see if 'vs' comes after plaintiff and defendant(ie, no 'vs'' that is of use to us)
     doc_text_plain_used = re.search(plain_used, document_text, flags=re.IGNORECASE)
     doc_text_vs_used = re.search(vs_used, document_text, flags=re.IGNORECASE)
     doc_text_def_used = re.search(def_used, document_text, flags=re.IGNORECASE)
@@ -593,8 +608,8 @@ for file_name in files:
     # defendant_count = len(sentence_list)
     # print(defendant_count)
 
-    # Will eeminate Commas from list of defendants if semi-colons are not present
-    # will distingiush between companies with US., Inc. names
+    # Will eliminate Commas from list of defendants if semi-colons are not present
+    # will distinguish between companies with US., Inc. names
     # will also keep names if FKA / DBA is present
     text
     semi_colon_checker(text)
@@ -1011,6 +1026,7 @@ for file_name in files:
     print((list_of_Defendants))
     complaint_num += 1
 
+    #will write case, defendants, and docketnumber to csv file for current pdf
     with open('MiguelAugustRun.csv', 'a+', newline='', encoding='utf-8') as result_file:
         wr = csv.writer(result_file)  # , dialect='excel')
         # for row in open("test2_v2File.csv"):
